@@ -1,0 +1,15 @@
+{
+  "version": "2026-09-04",
+  "policies": [
+    {"id":"RET-001","title":"Standard returns","rule":"Unused, unworn items with original tags may be returned within 30 days of delivery for a refund to the original payment method."},
+    {"id":"RET-002","title":"Final sale","rule":"Items marked Final Sale are not returnable or exchangeable unless they arrived damaged or incorrect."},
+    {"id":"RET-003","title":"Size exchanges","rule":"Eligible items may be exchanged once for another size within 30 days of delivery. The requested size must be in stock."},
+    {"id":"RET-004","title":"Damaged or incorrect item","rule":"Report a damaged, defective, or incorrect item within 14 days of delivery with an order number and clear photos. Send a replacement at no charge when stock exists; otherwise refund."},
+    {"id":"RET-005","title":"Lost in transit","rule":"If tracking has had no movement for 7 calendar days after shipment, open a carrier trace. After 10 days without movement, replace or refund the order."},
+    {"id":"RET-006","title":"Late delivery","rule":"A package still moving but later than its delivery estimate is not refundable for shipping. Share tracking and offer a one-time 10% goodwill code only when it is 5 or more days late."},
+    {"id":"RET-007","title":"Order cancellation","rule":"Orders can be canceled only before fulfillment. Once fulfilled, use the return process after delivery."},
+    {"id":"RET-008","title":"Price adjustments","rule":"One price adjustment is allowed within 7 days of purchase for a public sitewide promotion. Excludes clearance, final sale, bundles, and third-party promotions."},
+    {"id":"RET-009","title":"Promo codes","rule":"Only one promotion code may be applied per order. Codes cannot be added after an order is placed, and cannot be combined with sale or final-sale items."},
+    {"id":"RET-010","title":"Account security","rule":"Never disclose or change account, address, payment, or order details without verified access to the account. Send account-access issues to secure support."}
+  ]
+}
