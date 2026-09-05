@@ -5,6 +5,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from .evaluation import parse_provider_output, score, summary, validate_response
 from .prompting import load_versioned_records
 from .providers import DETERMINISTIC_INFERENCE_SETTINGS, call_model, openai_metadata
@@ -63,6 +65,7 @@ def evaluate(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     parser = argparse.ArgumentParser(prog="support-poc")
     sub = parser.add_subparsers(required=True)
     eval_parser = sub.add_parser("evaluate")
