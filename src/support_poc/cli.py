@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .evaluation import score, summary
+from .evaluation import parse_provider_output, score, summary, validate_response
 from .prompting import load_versioned_records
 from .providers import call_model
 
@@ -16,8 +16,21 @@ def evaluate(args: argparse.Namespace) -> None:
     scenario_version, scenarios = load_versioned_records(ROOT / "data/scenarios.json", "scenarios")
     results = []
     for scenario in scenarios:
-        actual = call_model(args.provider, scenario)
-        results.append({"scenario_id": scenario["id"], "actual": actual, "score": score(actual, scenario["expected"])})
+        try:
+            raw_output = call_model(args.provider, scenario)
+            actual, failures = parse_provider_output(raw_output)
+            failures.extend(validate_response(actual, scenario["expected"]) if not failures else [])
+        except Exception as error:
+            actual = {}
+            failures = [f"provider error: {error}"]
+        results.append(
+            {
+                "scenario_id": scenario["id"],
+                "actual": actual,
+                "failures": failures,
+                "score": score(actual, scenario["expected"]),
+            }
+        )
     report = {"provider": args.provider, "corpus": {"policy_version": policy_version, "scenario_version": scenario_version}, "summary": summary([r["score"] for r in results]), "results": results}
     serialized = json.dumps(report, indent=2)
     if args.output:
