@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from argparse import Namespace
@@ -174,6 +175,26 @@ def test_openai_missing_credential_is_reported_for_each_scenario(monkeypatch, ca
         ]
         for result in report["results"]
     )
+
+
+def test_openai_command_loads_key_from_a_dotenv_file(monkeypatch, tmp_path, capsys) -> None:
+    dotenv_key = "dotenv-test-key"
+    (tmp_path / ".env").write_text(f"OPENAI_API_KEY={dotenv_key}\n")
+    observed_keys = []
+
+    def provider(_provider, scenario, **_kwargs):
+        observed_keys.append(os.environ["OPENAI_API_KEY"])
+        return {**scenario["expected"], "customer_reply": "I can help with that."}
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(cli, "call_model", provider)
+    monkeypatch.setattr(sys, "argv", ["support-poc", "evaluate", "--provider", "openai", "--model", "test-model"])
+
+    cli.main()
+
+    assert observed_keys == [dotenv_key] * 28
+    assert dotenv_key not in capsys.readouterr().out
 
 
 def test_openai_missing_model_is_reported_for_each_scenario(monkeypatch, capsys) -> None:
