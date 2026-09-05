@@ -13,6 +13,18 @@ uv run support-poc evaluate --provider mock
 
 The mock provider returns each scenario's reference outcome so the corpus and evaluation path can be checked end-to-end. It is not a model-quality result.
 
+To create a hosted OpenAI baseline report, provide your credential through the
+environment, select the model explicitly, and choose an output path:
+
+```bash
+OPENAI_API_KEY=... uv run support-poc evaluate --provider openai --model gpt-5 --output reports/openai-baseline.json
+```
+
+OpenAI runs use a temperature of `0`, send the runtime policy prompt and full
+scenario conversation, and record the model, hosted endpoint type, timestamp,
+and inference settings in the report. API keys are never accepted as command
+arguments or written to reports.
+
 ## Deliverables
 
 - `data/policies.json`: ten versioned, auditable POC policies.

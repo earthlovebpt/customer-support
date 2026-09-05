@@ -97,3 +97,89 @@ def test_evaluation_records_missing_required_escalation_as_a_failure(monkeypatch
 
     report = json.loads(capsys.readouterr().out)
     assert any("required escalation was not requested" in result["failures"] for result in report["results"])
+
+
+def test_openai_evaluation_uses_the_command_seam_and_records_attribution(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-that-must-not-appear-in-the-report")
+    observed_requests = []
+
+    def transport(request):
+        observed_requests.append(request)
+        return {
+            "output_text": json.dumps(
+                {
+                    "applicable_policy_ids": ["RET-001"],
+                    "decision": "approve_return",
+                    "required_facts": [],
+                    "escalate": False,
+                    "customer_reply": "I can help you begin a return.",
+                }
+            )
+        }
+
+    cli.evaluate(Namespace(provider="openai", model="test-model", output=None, transport=transport))
+
+    report = json.loads(capsys.readouterr().out)
+    assert len(observed_requests) == report["summary"]["scenarios"] == 28
+    assert report["metadata"] == {
+        "model": "test-model",
+        "endpoint_type": "hosted_openai",
+        "inference_settings": {"temperature": 0},
+        "run_timestamp": report["metadata"]["run_timestamp"],
+    }
+    assert "test-key-that-must-not-appear-in-the-report" not in json.dumps(report)
+    request_payload = json.loads(observed_requests[0].data)
+    assert request_payload["model"] == "test-model"
+    assert request_payload["temperature"] == 0
+    assert request_payload["text"]["format"]["type"] == "json_schema"
+    assert "RET-001" in request_payload["input"][0]["content"]
+
+
+def test_openai_missing_credential_is_reported_for_each_scenario(monkeypatch, capsys) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    cli.evaluate(Namespace(provider="openai", model="test-model", output=None))
+
+    report = json.loads(capsys.readouterr().out)
+    assert all(
+        result["failures"] == [
+            "provider error: OPENAI_API_KEY environment variable is required for the OpenAI provider"
+        ]
+        for result in report["results"]
+    )
+
+
+def test_openai_missing_model_is_reported_for_each_scenario(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    cli.evaluate(Namespace(provider="openai", model=None, output=None))
+
+    report = json.loads(capsys.readouterr().out)
+    assert all(
+        result["failures"] == ["provider error: an explicit --model is required for the OpenAI provider"]
+        for result in report["results"]
+    )
+
+
+def test_openai_transport_failure_is_attached_to_each_scenario(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    def transport(_request):
+        raise RuntimeError("temporary outage")
+
+    cli.evaluate(Namespace(provider="openai", model="test-model", output=None, transport=transport))
+
+    report = json.loads(capsys.readouterr().out)
+    assert all(result["failures"] == ["provider error: temporary outage"] for result in report["results"])
+
+
+def test_openai_malformed_output_is_reported_per_scenario(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    def transport(_request):
+        return {"output_text": "not JSON"}
+
+    cli.evaluate(Namespace(provider="openai", model="test-model", output=None, transport=transport))
+
+    report = json.loads(capsys.readouterr().out)
+    assert all(result["failures"] == ["provider output is not valid JSON"] for result in report["results"])
