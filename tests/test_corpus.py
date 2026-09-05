@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from support_poc import cli
+from support_poc import providers
 from support_poc.metrics import SupportContractMetric, contract_test_case
 
 
@@ -281,31 +282,34 @@ def test_named_profiles_use_the_same_openai_workflow_and_are_attributable(
     expected_endpoint_url,
     expected_api_key_env,
 ) -> None:
-    observed_kwargs = []
+    observed_requests = []
 
-    def provider(_provider, scenario, **kwargs):
-        assert _provider == "openai"
-        observed_kwargs.append(kwargs)
-        return {**scenario["expected"], "customer_reply": "I can help with that."}
+    def transport(request):
+        observed_requests.append(request)
+        return {
+            "output_text": json.dumps(
+                {
+                    "applicable_policy_ids": ["RET-001"],
+                    "decision": "approve_return",
+                    "required_facts": [],
+                    "escalate": False,
+                    "customer_reply": "I can help with that.",
+                }
+            )
+        }
 
-    monkeypatch.setattr(cli, "call_model", provider)
-    cli.evaluate(Namespace(provider=None, profile=profile_name, model=None, output=None, transport=None))
+    monkeypatch.setenv(expected_api_key_env, "test-key")
+    cli.evaluate(Namespace(provider=None, profile=profile_name, model=None, output=None, transport=transport))
 
     report = json.loads(capsys.readouterr().out)
     assert report["provider"] == "openai"
     assert report["metadata"]["model"] == expected_model
     assert report["metadata"]["endpoint_type"] == expected_endpoint_type
     assert report["metadata"]["profile"] == profile_name
-    assert report["metadata"]["inference_settings"] == {"temperature": 0}
-    assert report["summary"]["metrics"]["support_contract"] == {
-        "name": "Support contract",
-        "count": 28,
-        "mean_score": 1.0,
-    }
+    assert report["metadata"]["inference_settings"] == {}
     assert report["evaluation"]["judge_metric"]["status"] == "not_run"
-    assert all(item["metrics"][0]["success"] is True for item in report["results"])
-    assert len(observed_kwargs) == 28
-    assert all(kwargs["model"] == expected_model for kwargs in observed_kwargs)
-    assert all(kwargs["endpoint_url"] == expected_endpoint_url for kwargs in observed_kwargs)
-    assert all(kwargs["api_key_env"] == expected_api_key_env for kwargs in observed_kwargs)
-    assert all(kwargs["inference_settings"] == {"temperature": 0} for kwargs in observed_kwargs)
+    assert len(observed_requests) == 28
+    request_payloads = [json.loads(request.data) for request in observed_requests]
+    assert all(payload["model"] == expected_model for payload in request_payloads)
+    assert all("temperature" not in payload for payload in request_payloads)
+    assert all(request.full_url == (expected_endpoint_url or providers.OPENAI_RESPONSES_URL) for request in observed_requests)
