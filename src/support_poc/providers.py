@@ -18,12 +18,19 @@ class ProviderError(RuntimeError):
     pass
 
 
-def openai_metadata(model: str | None) -> dict[str, object]:
+def openai_metadata(
+    model: str | None,
+    *,
+    endpoint_type: str = "hosted_openai",
+    inference_settings: Mapping[str, object] | None = None,
+    profile: str | None = None,
+) -> dict[str, object]:
     """Return reportable configuration without including credentials."""
     return {
         "model": model,
-        "endpoint_type": "hosted_openai",
-        "inference_settings": INFERENCE_SETTINGS.copy(),
+        "endpoint_type": endpoint_type,
+        "inference_settings": dict(inference_settings or INFERENCE_SETTINGS),
+        **({"profile": profile} if profile else {}),
     }
 
 
@@ -98,10 +105,13 @@ def _call_openai(
     policies: list[dict],
     model: str | None,
     transport: Callable[[Request], Mapping[str, object]] | None,
+    endpoint_url: str | None,
+    api_key_env: str,
+    inference_settings: Mapping[str, object] | None,
 ) -> str:
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = os.environ.get(api_key_env)
     if not api_key:
-        raise ProviderError("OPENAI_API_KEY environment variable is required for the OpenAI provider")
+        raise ProviderError(f"{api_key_env} environment variable is required for the OpenAI provider")
     if not model:
         raise ProviderError("an explicit --model is required for the OpenAI provider")
 
@@ -117,8 +127,9 @@ def _call_openai(
             }
         },
     }
+    body.update(inference_settings or INFERENCE_SETTINGS)
     request = Request(
-        OPENAI_RESPONSES_URL,
+        endpoint_url or OPENAI_RESPONSES_URL,
         data=json.dumps(body).encode("utf-8"),
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         method="POST",
@@ -133,6 +144,9 @@ def call_model(
     policies: list[dict] | None = None,
     model: str | None = None,
     transport: Callable[[Request], Mapping[str, object]] | None = None,
+    endpoint_url: str | None = None,
+    api_key_env: str = "OPENAI_API_KEY",
+    inference_settings: Mapping[str, object] | None = None,
 ) -> dict | str:
     if provider == "mock":
         expected = scenario["expected"]
@@ -140,5 +154,5 @@ def call_model(
     if provider == "openai":
         if policies is None:
             raise ProviderError("runtime policies are required for the OpenAI provider")
-        return _call_openai(scenario, policies, model, transport)
+        return _call_openai(scenario, policies, model, transport, endpoint_url, api_key_env, inference_settings)
     raise ProviderError(f"Unknown provider: {provider}")

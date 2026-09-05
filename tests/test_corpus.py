@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from support_poc import cli
+from support_poc.metrics import SupportContractMetric, contract_test_case
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -231,3 +232,48 @@ def test_openai_malformed_output_is_reported_per_scenario(monkeypatch, capsys) -
 
     report = json.loads(capsys.readouterr().out)
     assert all(result["failures"] == ["provider output is not valid JSON"] for result in report["results"])
+
+
+def test_contract_metric_is_offline_and_snapshots_the_existing_score() -> None:
+    scenario = {
+        "conversation": [{"role": "customer", "content": "I need a return."}],
+        "expected": {
+            "applicable_policy_ids": ["RET-001"],
+            "decision": "approve_return",
+            "required_facts": [],
+            "escalate": False,
+        },
+    }
+    actual = {**scenario["expected"], "customer_reply": "I can help you start a return."}
+
+    metric = SupportContractMetric()
+    assert metric.measure(contract_test_case(scenario, actual)) == 1.0
+    assert metric.is_successful() is True
+    assert metric.reason == "all deterministic checks passed"
+
+
+def test_named_local_profile_uses_the_same_openai_workflow_and_is_attributable(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("LOCAL_OPENAI_API_KEY", "local-test-key")
+    observed_kwargs = []
+
+    def provider(_provider, scenario, **kwargs):
+        observed_kwargs.append(kwargs)
+        return {**scenario["expected"], "customer_reply": "I can help with that."}
+
+    monkeypatch.setattr(cli, "call_model", provider)
+    cli.evaluate(Namespace(provider=None, profile="candidate-slm-a", model=None, output=None, transport=None))
+
+    report = json.loads(capsys.readouterr().out)
+    assert report["metadata"]["model"] == "Qwen/Qwen2.5-3B-Instruct"
+    assert report["metadata"]["endpoint_type"] == "local_openai_compatible"
+    assert report["metadata"]["profile"] == "candidate-slm-a"
+    assert report["metadata"]["inference_settings"] == {"temperature": 0}
+    assert report["summary"]["metrics"]["support_contract"] == {
+        "name": "Support contract",
+        "count": 28,
+        "mean_score": 1.0,
+    }
+    assert report["evaluation"]["judge_metric"]["status"] == "not_run"
+    assert all(item["metrics"][0]["success"] is True for item in report["results"])
+    assert all(kwargs["endpoint_url"] == "http://127.0.0.1:8000/v1/responses" for kwargs in observed_kwargs)
+    assert all(kwargs["inference_settings"] == {"temperature": 0} for kwargs in observed_kwargs)

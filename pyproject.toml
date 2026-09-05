@@ -5,6 +5,7 @@ description = "Policy-grounded fashion retailer support-model evaluation POC"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "deepeval>=4.2.1,<5",
     "python-dotenv>=1.0",
 ]
 
