@@ -152,13 +152,13 @@ def test_openai_evaluation_uses_the_command_seam_and_records_attribution(monkeyp
     assert report["metadata"] == {
         "model": "test-model",
         "endpoint_type": "hosted_openai",
-        "inference_settings": {"temperature": 0},
+        "inference_settings": {},
         "run_timestamp": report["metadata"]["run_timestamp"],
     }
     assert "test-key-that-must-not-appear-in-the-report" not in json.dumps(report)
     request_payload = json.loads(observed_requests[0].data)
     assert request_payload["model"] == "test-model"
-    assert request_payload["temperature"] == 0
+    assert "temperature" not in request_payload
     assert request_payload["text"]["format"]["type"] == "json_schema"
     assert "RET-001" in request_payload["input"][0]["content"]
 

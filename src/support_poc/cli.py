@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from .evaluation import parse_provider_output, score, summary, validate_response
 from .prompting import load_versioned_records
-from .providers import DETERMINISTIC_INFERENCE_SETTINGS, call_model, openai_metadata
+from .providers import INFERENCE_SETTINGS, call_model, openai_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,7 +47,7 @@ def evaluate(args: argparse.Namespace) -> None:
     metadata = (
         openai_metadata(model)
         if args.provider == "openai"
-        else {"model": "mock", "endpoint_type": "mock", "inference_settings": DETERMINISTIC_INFERENCE_SETTINGS.copy()}
+        else {"model": "mock", "endpoint_type": "mock", "inference_settings": INFERENCE_SETTINGS.copy()}
     )
     metadata["run_timestamp"] = datetime.now(timezone.utc).isoformat()
     report = {
