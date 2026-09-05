@@ -252,21 +252,50 @@ def test_contract_metric_is_offline_and_snapshots_the_existing_score() -> None:
     assert metric.reason == "all deterministic checks passed"
 
 
-def test_named_local_profile_uses_the_same_openai_workflow_and_is_attributable(monkeypatch, capsys) -> None:
-    monkeypatch.setenv("LOCAL_OPENAI_API_KEY", "local-test-key")
+@pytest.mark.parametrize(
+    ("profile_name", "expected_model", "expected_endpoint_type", "expected_endpoint_url", "expected_api_key_env"),
+    [
+        ("quality-reference", "gpt-5.6-luna", "hosted_openai", None, "OPENAI_API_KEY"),
+        (
+            "candidate-slm-a",
+            "Qwen/Qwen2.5-3B-Instruct",
+            "local_openai_compatible",
+            "http://127.0.0.1:8000/v1/responses",
+            "LOCAL_OPENAI_API_KEY",
+        ),
+        (
+            "candidate-slm-b",
+            "google/gemma-3-4b-it",
+            "local_openai_compatible",
+            "http://127.0.0.1:8001/v1/responses",
+            "LOCAL_OPENAI_API_KEY",
+        ),
+    ],
+)
+def test_named_profiles_use_the_same_openai_workflow_and_are_attributable(
+    monkeypatch,
+    capsys,
+    profile_name,
+    expected_model,
+    expected_endpoint_type,
+    expected_endpoint_url,
+    expected_api_key_env,
+) -> None:
     observed_kwargs = []
 
     def provider(_provider, scenario, **kwargs):
+        assert _provider == "openai"
         observed_kwargs.append(kwargs)
         return {**scenario["expected"], "customer_reply": "I can help with that."}
 
     monkeypatch.setattr(cli, "call_model", provider)
-    cli.evaluate(Namespace(provider=None, profile="candidate-slm-a", model=None, output=None, transport=None))
+    cli.evaluate(Namespace(provider=None, profile=profile_name, model=None, output=None, transport=None))
 
     report = json.loads(capsys.readouterr().out)
-    assert report["metadata"]["model"] == "Qwen/Qwen2.5-3B-Instruct"
-    assert report["metadata"]["endpoint_type"] == "local_openai_compatible"
-    assert report["metadata"]["profile"] == "candidate-slm-a"
+    assert report["provider"] == "openai"
+    assert report["metadata"]["model"] == expected_model
+    assert report["metadata"]["endpoint_type"] == expected_endpoint_type
+    assert report["metadata"]["profile"] == profile_name
     assert report["metadata"]["inference_settings"] == {"temperature": 0}
     assert report["summary"]["metrics"]["support_contract"] == {
         "name": "Support contract",
@@ -275,5 +304,8 @@ def test_named_local_profile_uses_the_same_openai_workflow_and_is_attributable(m
     }
     assert report["evaluation"]["judge_metric"]["status"] == "not_run"
     assert all(item["metrics"][0]["success"] is True for item in report["results"])
-    assert all(kwargs["endpoint_url"] == "http://127.0.0.1:8000/v1/responses" for kwargs in observed_kwargs)
+    assert len(observed_kwargs) == 28
+    assert all(kwargs["model"] == expected_model for kwargs in observed_kwargs)
+    assert all(kwargs["endpoint_url"] == expected_endpoint_url for kwargs in observed_kwargs)
+    assert all(kwargs["api_key_env"] == expected_api_key_env for kwargs in observed_kwargs)
     assert all(kwargs["inference_settings"] == {"temperature": 0} for kwargs in observed_kwargs)
