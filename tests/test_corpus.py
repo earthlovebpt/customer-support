@@ -12,6 +12,21 @@ from support_poc import cli
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def run_mock_evaluation_command(monkeypatch, tmp_path, provider_output: str) -> dict:
+    """Run the evaluation command and return its serialized report."""
+    report_path = tmp_path / "evaluation-report.json"
+    monkeypatch.setattr(cli, "call_model", lambda _provider, _scenario: provider_output)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["support-poc", "evaluate", "--provider", "mock", "--output", str(report_path)],
+    )
+
+    cli.main()
+
+    return json.loads(report_path.read_text())
+
+
 def test_mock_evaluation_covers_every_policy() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "support_poc.cli", "evaluate", "--provider", "mock"],
@@ -42,21 +57,33 @@ def test_corpus_includes_a_multi_turn_customer_conversation() -> None:
 
 
 @pytest.mark.parametrize(
-    ("provider_output", "expected_failure"),
+    ("provider_output", "expected_failures"),
     [
-        ("not json", "provider output is not valid JSON"),
-        (json.dumps({"applicable_policy_ids": ["RET-001"]}), "missing required field: decision"),
+        ("not json", ["provider output is not valid JSON"]),
+        (
+            json.dumps({"applicable_policy_ids": [], "decision": "request_information"}),
+            [
+                "missing required field: required_facts",
+                "missing required field: escalate",
+                "missing required field: customer_reply",
+            ],
+        ),
         (
             json.dumps(
                 {
-                    "applicable_policy_ids": "RET-001",
-                    "decision": "approve_return",
-                    "required_facts": [],
-                    "escalate": False,
+                    "applicable_policy_ids": ["RET-001", 42],
+                    "decision": 7,
+                    "required_facts": "order_number",
+                    "escalate": "no",
                     "customer_reply": "I can help with that.",
                 }
             ),
-            "applicable_policy_ids must be an array of strings",
+            [
+                "applicable_policy_ids must be an array of strings",
+                "decision must be a string",
+                "required_facts must be an array of strings",
+                "escalate must be a boolean",
+            ],
         ),
         (
             json.dumps(
@@ -68,20 +95,24 @@ def test_corpus_includes_a_multi_turn_customer_conversation() -> None:
                     "customer_reply": "Under RET-001, I will approve_return this request.",
                 }
             ),
-            "customer_reply exposes an internal policy identifier",
+            [
+                "customer_reply exposes an internal policy identifier",
+                "customer_reply exposes an internal decision label",
+            ],
         ),
     ],
 )
-def test_evaluation_records_invalid_provider_output_as_failures(monkeypatch, capsys, provider_output, expected_failure) -> None:
-    monkeypatch.setattr(cli, "call_model", lambda _provider, _scenario: provider_output)
+def test_evaluation_command_serializes_invalid_provider_output_failures(
+    monkeypatch, tmp_path, provider_output, expected_failures
+) -> None:
+    report = run_mock_evaluation_command(monkeypatch, tmp_path, provider_output)
+    assert all(
+        all(expected_failure in result["failures"] for expected_failure in expected_failures)
+        for result in report["results"]
+    )
 
-    cli.evaluate(Namespace(provider="mock", output=None))
 
-    report = json.loads(capsys.readouterr().out)
-    assert all(expected_failure in result["failures"] for result in report["results"])
-
-
-def test_evaluation_records_missing_required_escalation_as_a_failure(monkeypatch, capsys) -> None:
+def test_evaluation_command_serializes_missing_required_escalation_as_a_failure(monkeypatch, tmp_path) -> None:
     provider_output = json.dumps(
         {
             "applicable_policy_ids": ["RET-001"],
@@ -91,11 +122,7 @@ def test_evaluation_records_missing_required_escalation_as_a_failure(monkeypatch
             "customer_reply": "I can help with that.",
         }
     )
-    monkeypatch.setattr(cli, "call_model", lambda _provider, _scenario: provider_output)
-
-    cli.evaluate(Namespace(provider="mock", output=None))
-
-    report = json.loads(capsys.readouterr().out)
+    report = run_mock_evaluation_command(monkeypatch, tmp_path, provider_output)
     assert any("required escalation was not requested" in result["failures"] for result in report["results"])
 
 
