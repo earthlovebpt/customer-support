@@ -6,7 +6,7 @@
       "model": "gpt-5.6-luna",
       "endpoint_type": "hosted_openai",
       "api_key_env": "OPENAI_API_KEY",
-      "inference_settings": {"temperature": 0}
+      "inference_settings": {}
     },
     "candidate-slm-a": {
       "provider": "openai",
@@ -14,7 +14,7 @@
       "endpoint_type": "local_openai_compatible",
       "endpoint_url": "http://127.0.0.1:8000/v1/responses",
       "api_key_env": "LOCAL_OPENAI_API_KEY",
-      "inference_settings": {"temperature": 0}
+      "inference_settings": {}
     },
     "candidate-slm-b": {
       "provider": "openai",
@@ -22,7 +22,7 @@
       "endpoint_type": "local_openai_compatible",
       "endpoint_url": "http://127.0.0.1:8001/v1/responses",
       "api_key_env": "LOCAL_OPENAI_API_KEY",
-      "inference_settings": {"temperature": 0}
+      "inference_settings": {}
     }
   }
 }

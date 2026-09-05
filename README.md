@@ -26,8 +26,8 @@ Profiles are versioned in `data/model_profiles.json`. The quality reference uses
 the hosted OpenAI Responses endpoint and `OPENAI_API_KEY`. The candidate profiles
 use local OpenAI-compatible Responses endpoints and `LOCAL_OPENAI_API_KEY`. Start
 the corresponding local server before running a candidate profile. All three use
-the same deterministic inference settings (`temperature: 0`) and exact policy and
-scenario suite. Choose a different compatible endpoint without changing workflows:
+the same empty inference settings and exact policy and scenario suite. Choose a
+different compatible endpoint without changing workflows:
 
 ```bash
 uv run support-poc evaluate --provider openai --model my-local-model \
