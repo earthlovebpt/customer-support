@@ -21,10 +21,11 @@ uv run support-poc evaluate --provider openai --model gpt-5.6-luna --output repo
 ```
 
 The command loads `.env` from the current directory without overriding an
-already-exported environment variable. OpenAI runs use a temperature of `0`,
-send the runtime policy prompt and full scenario conversation, and record the
-model, hosted endpoint type, timestamp, and inference settings in the report.
-API keys are never accepted as command arguments or written to reports.
+already-exported environment variable. OpenAI runs use the model default
+sampling settings, send the runtime policy prompt and full scenario
+conversation, and record the model, hosted endpoint type, timestamp, and
+inference settings in the report. API keys are never accepted as command
+arguments or written to reports.
 
 ## Deliverables
 

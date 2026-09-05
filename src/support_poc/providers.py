@@ -11,7 +11,7 @@ from .prompting import messages_for
 
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-DETERMINISTIC_INFERENCE_SETTINGS = {"temperature": 0}
+INFERENCE_SETTINGS: dict[str, object] = {}
 
 
 class ProviderError(RuntimeError):
@@ -23,7 +23,7 @@ def openai_metadata(model: str | None) -> dict[str, object]:
     return {
         "model": model,
         "endpoint_type": "hosted_openai",
-        "inference_settings": DETERMINISTIC_INFERENCE_SETTINGS.copy(),
+        "inference_settings": INFERENCE_SETTINGS.copy(),
     }
 
 
@@ -108,7 +108,6 @@ def _call_openai(
     body: dict[str, Any] = {
         "model": model,
         "input": _openai_input(scenario, policies),
-        "temperature": DETERMINISTIC_INFERENCE_SETTINGS["temperature"],
         "text": {
             "format": {
                 "type": "json_schema",
